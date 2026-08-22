@@ -104,9 +104,11 @@ sequenceDiagram
 
 **Ключевые контракты:**
 
-- **Поллер — единственный writer** в `chat_messages` для draft'а: `create_streaming`
-  на старте, `finalize`/`mark_failed` по результату `poll_once`. Фронт лишь
-  опрашивает готовность.
+- **`create_streaming` вызывается при `submit()`** — из API-хендлера `send_message`
+  (режим `always`) или из `agent_loop.py::_handle_forward_terminal` (режим
+  `adaptive`), **не поллером**. Поллер — единственный writer в `chat_messages`
+  для дальнейшего заполнения draft'а: `finalize`/`mark_failed`/upsert блоков по
+  результату `poll_once`. Фронт лишь опрашивает готовность.
 - **Таймаут**: двухфазный — `CLAIM_TIMEOUT_SEC` (1800) пока `pending`, `ANSWER_TIMEOUT_SEC` (1800) пока `processing`. Поллер вызывает
   `mark_timeout(reason='claim'|'answer')` → draft → `failed` с error-блоком (`build_timeout_error_block`);
   вопрос в шине best-effort закрывается `status='failed'` (если CHECK владельца
@@ -135,7 +137,7 @@ sequenceDiagram
     participant F as Frontend
     participant API as POST /messages<br/>(api/messages.py)
     participant ORCH as Orchestrator<br/>(orchestrator.run)
-    participant FT as forward-tool<br/>(forward_tool_factory.py)
+    participant AL as agent_loop.py<br/>(_handle_forward_terminal)
     participant CS as AgentChannelService
     participant DB as БД
     participant POLL as AgentChannelPoller
@@ -143,12 +145,12 @@ sequenceDiagram
     U->>F: вопрос (agent_mode=adaptive)
     F->>API: POST /messages (FormData)
     API->>ORCH: run(message_id, agent_mode='adaptive', ...)
-    Note over ORCH: forward-tool в наборе.<br/>LLM сама решает, форвардить ли.
+    Note over ORCH: forward-tool в наборе (схема зарегистрирована<br/>статически через forward_tool_factory.py).<br/>LLM сама решает, форвардить ли.
     alt LLM отвечает локально
         ORCH->>DB: сохранить ответ chat_messages<br/>(status='complete')
     else LLM зовёт forward-tool
-        ORCH->>FT: tool_call
-        FT->>CS: submit(mode='adaptive', ...)
+        ORCH->>AL: tool_call (tool_name=forward_to_knowledge_agent)
+        AL->>CS: submit(mode='adaptive', ...)
         CS->>DB: INSERT вопрос (pending)<br/>+ create_streaming draft (status='streaming')
         Note over POLL: поллер подхватит draft и<br/>финализирует через poll_once<br/>(см. диаграмму §1)
     end
@@ -268,7 +270,11 @@ WHERE user_id = $1 AND role = 'user' AND (
   (`subscribe` / `unsubscribe` / `_tick` / `_abandon_subscription` /
   `reconcile` / `_run` adaptive-backoff, `start` / `stop` / `get_status`)
 - button_translator — `app/domains/chat/services/button_translator.py` (`translate_buttons`)
-- forward-tool (adaptive) — `app/domains/chat/services/forward_tool_factory.py`
+- форвард-перехват (adaptive) — `app/domains/chat/services/agent_loop.py`
+  (`_handle_forward_terminal`, вызывается из `run_agent_loop` при
+  `tool_name == TOOL_FORWARD_TO_KNOWLEDGE_AGENT`); реально вызывает `channel.submit(...)`
+- forward-tool (статическая регистрация схемы тула при `discover_domains()`) —
+  `app/domains/chat/services/forward_tool_factory.py` (`build_forward_tool_descriptor`)
 - bus-репозиторий — `app/domains/chat/repositories/agent_message_repository.py` (`count_active_for_user`, `get_by_uid`, `get_answer_for_question`, `get_media_by_uid`, `get_status_by_uid`)
 - chat_messages streaming-методы — `app/domains/chat/repositories/message_repository.py`
   (`create_streaming`/`finalize`/`mark_failed`/`get_streaming_drafts`)

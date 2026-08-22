@@ -31,16 +31,16 @@ Audit Workstation — Server-side rendered (Jinja2) + vanilla JS приложе�
 
 | Параметр | Значение |
 |---|---|
-| Всего JS-файлов | 183 (`static/js/**/*.js`) |
-| `constructor/` (редактор актов) | 106 файлов (включая `search/` и инфраструктуру поверхностей, §1.2) |
+| Всего JS-файлов | 192 (`static/js/**/*.js`) |
+| `constructor/` (редактор актов) | 115 файлов (включая `search/` и инфраструктуру поверхностей, §1.2) |
 | `shared/` (cross-zone модули + чат) | 42 файла (включая 13 модулей чата) |
 | `portal/` (sidebar-страницы) | 32 файла (включая профиль/карточку пользователя и `sqlagent/`) |
 | `entries/` | 2 (`portal-common.js`, `constructor.js`) |
 | Вне зон | 1 (`static/js/auth.js` — страница входа) |
 | Всего CSS-файлов | 97 |
-| `constructor/` CSS | 45 файлов (включая `layout/density.css`, §13.5) |
+| `constructor/` CSS | 44 файла (включая `layout/density.css`, §13.5) |
 | `portal/` CSS | 20 файлов (включая `layout/density.css`, §13.5) |
-| `shared/` CSS | 17 файлов |
+| `shared/` CSS | 18 файлов |
 | `base/` CSS | 11 файлов |
 | CSS-переменных | 581 (уникальных имён, дублей нет), `base/variables.css` — агрегатор, сами переменные в `base/variables/{colors,components,typography,spacing,shadows,motion,z-index}.css` |
 
@@ -433,7 +433,7 @@ API:
 
 ## 5. `StorageManager` и persistence
 
-`constructor/storage-manager.js` (1235 строк) — менеджер двухуровневого хранилища: localStorage (быстро, локально) + БД через `APIClient.saveActContent` (медленно, надёжно).
+`constructor/storage-manager.js` (1557 строк) — менеджер двухуровневого хранилища: localStorage (быстро, локально) + БД через `APIClient.saveActContent` (медленно, надёжно).
 
 ### 5.1 State machine
 
@@ -450,7 +450,7 @@ markAsSyncedWithDB()  ◀──── PUT /content ──── 'local-only'
    └─────────────────────────── _markAsSaved() (из saveState)
 ```
 
-Единое поле `_state ∈ {'saved'|'local-only'|'unsaved'}` (`storage-manager.js:65`). Зеркала `_hasUnsavedChanges` и `_isSyncedWithDB` (`:73, :81`) сохраняются только для backward-совместимости со старыми консьюмерами (beforeunload-warning, `hasUnsavedChanges()`); единая точка перехода — `_setState(newState)` (`:560-570`).
+Единое поле `_state ∈ {'saved'|'local-only'|'unsaved'}` (`storage-manager.js:66`). Зеркала `_hasUnsavedChanges` и `_isSyncedWithDB` (`:74, :82`) сохраняются только для backward-совместимости со старыми консьюмерами (beforeunload-warning, `hasUnsavedChanges()`); единая точка перехода — `_setState(newState)` (`:732-743`).
 
 UI:
 
@@ -476,7 +476,7 @@ UI:
 
 ### 5.3 Navigation interception
 
-`_setupNavigationInterception()` (`storage-manager.js:418`) защищает от навигации с несохранёнными изменениями двумя слоями:
+`_setupNavigationInterception()` (`storage-manager.js:554`) защищает от навигации с несохранёнными изменениями двумя слоями:
 
 1. **`popstate`-страж** — `history.replaceState({_lockNavGuard:true}, ...)` при инициализации плюс `confirmHistoryNavigation(shownActId, shownUrl)`, которая показывает диалог и при отказе возвращает адресную строку через `history.pushState`. Оба вызова **мержат** свои поля в текущий `history.state`, а не заменяют его целиком — запись истории одновременно несёт `actId`, записанный `acts-menu.js` (см. §6, «Первая запись истории обязана нести `actId`»).
 2. **Click-handler на `<a href>` с внутренним hostname** — захватывает клик до навигации, показывает диалог.
@@ -485,9 +485,9 @@ UI:
 >
 > Теперь владелец один и последовательность явная: обработчик `popstate` в `acts-menu.js` спрашивает `StorageManager.confirmHistoryNavigation(shownActId, shownUrl)` **до** начала переключения. Отказ (`false`) — выходим, не тронув ни лок, ни `AppState`, и пушим запись **показанного** акта (`{...state, actId: shownActId}` + его URL). Согласие (`true`) — просто переключаемся: мы уже стоим на целевой записи истории, `history.back()` не нужен. Порядок регистрации слушателей на корректность больше не влияет — слушатель один. Сами переходы (и по `popstate`, и через меню) сериализованы общей очередью — §6. Регрессия — `tests/js/popstate-single-owner.test.mjs`.
 
-`confirmNavigation(targetUrl, opts)` (`:1177`) — публичный API: показать диалог «Сохранить и уйти / уйти без сохранения / отменить», вернуть Promise<bool>. Используется в `LockManager._lockAct` (на 409 и на 5xx: `lock-manager.js:220, 241`), `acts-menu.js` (при switch'е акта).
+`confirmNavigation(targetUrl, opts)` (`:1495`) — публичный API: показать диалог «Сохранить и уйти / уйти без сохранения / отменить», вернуть Promise<bool>. Используется в `LockManager._lockAct` (на 409 и на 5xx: `lock-manager.js:220, 241`), `acts-menu.js` (при switch'е акта).
 
-`allowUnload()` (`:1022`) — снимает `_lockNavGuard`, разрешая `window.location.href = ...` без диалога. Вызывается в `LockManager._initiateExit` (`lock-manager.js:603-604`) — сессия завершается принудительно, диалог здесь блокировал бы автоэкзит.
+`allowUnload()` (`:1340`) — снимает `_lockNavGuard`, разрешая `window.location.href = ...` без диалога. Вызывается в `LockManager._initiateExit` (`lock-manager.js:603-604`) — сессия завершается принудительно, диалог здесь блокировал бы автоэкзит.
 
 ### 5.4 ChangelogTracker
 
@@ -1264,7 +1264,9 @@ UI-шкалы `--font-size-*` или литерала в пунктах — до
 
 ### 13.7 Cache-busting
 
-Jinja-фильтр `versioned` (применяется ко всем `url_for('static', path='...')`) добавляет `?v={app_version}` к URL. Регистрируется в `app/core/templating.py:32`; значение берётся из `Settings.app_version`, а тот — из `__version__` в `app/__init__.py`. При смене версии браузер форсированно перезагружает статику.
+Версия зашита не query-параметром, а **сегментом пути** статики. Jinja-фильтр `versioned` (регистрируется в `get_templates()`, `app/core/templating.py:140`; значение — `Settings.app_version`, а тот — из `__version__` в `app/__init__.py`) превращает `/static/js/entries/constructor.js` → `/static/v{app_version}/js/entries/constructor.js` (`_versioned`, `templating.py:16-52`). Путь выбран сознательно: фильтр применяется только к ~30 URL, написанным в шаблонах напрямую, а дальше по графу тянутся относительные `import`'ы ES-модулей (и `@import` в CSS) — они резолвятся от URL импортирующего файла, поэтому версия из пути наследуется всем графом автоматически. Query-параметр этим свойством не обладал бы: остался бы только на самом шаблонном URL, а весь граф зависимостей продолжил бы читаться из кеша старым.
+
+Раздачу версионированных путей с диска обслуживает `VersionedStaticFiles` — подкласс `StaticFiles` (`templating.py:75-125`), примонтированный в `app/main.py:354-361` на `/static` вместо обычного `StaticFiles` (работают оба адреса: прямой `/static/<путь>` и версионированный `/static/v<версия>/<путь>`). `get_path` вызывает `_strip_static_version` (`templating.py:55-72`), который срезает сегмент `v<версия>`, идущий сразу за mount-префиксом, и резолвит файл с диска уже без версии; сегмент считается версией по маске `v` + цифра, чтобы не задеть реальные каталоги (`vendor/`). Версия **не валидируется и не сравнивается** с текущей — это чистый cache-buster, поэтому вкладка, открытая до релиза, по старому пути по-прежнему получает файл, а не 404. На версионированном пути `get_response` дополнительно проставляет `Cache-Control`: вечный `public, max-age=31536000, immutable`, если включён `SECURITY__STATIC_IMMUTABLE` (`settings.security.static_immutable`), иначе `public, max-age=0, must-revalidate` — DEV-режим допускает кеш, но обязывает браузер ревалидировать по ETag.
 
 ### 13.8 `<meta name="app-version">`
 

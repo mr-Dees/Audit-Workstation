@@ -66,6 +66,8 @@ env-префикс `CHAT__RETRY__`): `on_429=True`, `on_5xx=True`, `max_attempts
 | 31 | Дедлайн redis-моста | `BridgeDeadlineError` (подкласс `APITimeoutError`) | — | Без ретрая, проброс (fallback при этом работает) | `test_redis_bridge_adapter.py::TestBridgeErrorsNotRetried::test_retry_does_not_repeat_bridge_deadline` |
 | 32 | Сбой Redis на поллинге ответа моста (заявка уже в stream) | `BridgePollError` (подкласс `APIConnectionError`) | — | Без ретрая, проброс (fallback при этом работает); повторного `xadd` нет | `test_redis_bridge_adapter.py::TestBridgeErrorsNotRetried::test_retry_does_not_repeat_bridge_poll_error`, `TestSubmitVersusPollFailure::test_poll_failure_does_not_resubmit_envelope` |
 | 33 | Сбой Redis на постановке заявки моста (заявки в stream нет) | `APIConnectionError` | **connect** | Ретрай — дубля не будет | `test_redis_bridge_adapter.py::TestSubmitVersusPollFailure::test_xadd_failure_stays_retryable_connection_error` |
+| 34 | Ответ воркера не разобрался в ChatCompletion | `BridgeSchemaError` (подкласс `APIStatusError`, статус 502) | — | Без ретрая, проброс — разбор детерминирован, повтор = новая заявка в stream | `test_redis_bridge_adapter.py::TestSchemaErrorNotRetried::test_retry_does_not_repeat_bridge_schema_error` |
+| 35 | 429/5xx от бэкенда за воркером либо `finish_reason="error"` | `BridgeBackendError` (подкласс `APIStatusError`, статус 502) | — | Без ретрая, проброс — воркер уже повторял сам (3 попытки), иначе до 15 реальных вызовов LLM на одно сообщение | `test_redis_bridge_adapter.py::TestBackendFailures::test_retry_does_not_repeat_backend_error` |
 
 ## Пример теста
 
@@ -111,11 +113,12 @@ async def test_retries_on_5xx_then_succeeds():
 - `backoff_base=0.0` в тестах — задержка фактически равна jitter `[0, 0.5)`; там, где
   важен сам факт и величина пауз, `asyncio.sleep` мокается, чтобы не тормозить pytest.
 - `_NEVER_RETRY_EXC` (`ChatLimitError`, `ChatFileValidationError`, `ChatRateLimitError`,
-  `BridgeDeadlineError`, `BridgePollError`) ловится ПЕРВЫМ — раньше `APIStatusError`,
-  `APITimeoutError`, `_TRANSIENT_NETWORK_EXC` и `_CONNECT_NETWORK_EXC`. Поэтому подкласс
-  ретраябельного исключения (`BridgeDeadlineError` от `APITimeoutError`,
-  `BridgePollError` от `APIConnectionError`) не ретраится, даже если базовый класс
-  ретраится.
+  `BridgeDeadlineError`, `BridgePollError`, `BridgeSchemaError`, `BridgeBackendError`)
+  ловится ПЕРВЫМ — раньше `APIStatusError`, `APITimeoutError`, `_TRANSIENT_NETWORK_EXC`
+  и `_CONNECT_NETWORK_EXC`. Поэтому подкласс ретраябельного исключения
+  (`BridgeDeadlineError` от `APITimeoutError`, `BridgePollError` от `APIConnectionError`,
+  `BridgeSchemaError`/`BridgeBackendError` от `APIStatusError` со статусом 502) не
+  ретраится, даже если базовый класс ретраится.
 
 ## Text-actions: свой кап попыток поверх того же слоя
 

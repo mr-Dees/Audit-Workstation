@@ -1594,7 +1594,7 @@ segments: [], footnoteBody: true, footnoteEl }` — `segments` всегда `[]`
   вовсе. Что именно Chromium порождает после `execCommand('indent')`, снимает
   ли `removeFormat` список без потери капсул и переживает ли вложенность
   round-trip через санитайзер `acts` (DOMPurify недоступен в node) — покрыто
-  `tests/playwright/specs/29-textblock-multilevel-lists.spec.ts` (10 сценариев,
+  `tests/playwright/specs/29-textblock-multilevel-lists.spec.ts` (17 сценариев,
   §14).
 - **MD/TXT: маркер списка по уровням НЕ меняется, только отступ.** В отличие
   от DOCX (`w:lvlText` циклится по 3 уровня, `numbering.py`) и
@@ -1792,7 +1792,7 @@ Tab/Shift+Tab, §6),
 `rich-text.test.mjs`. E2E (Playwright) — спеки
 `24-violation-field-drop`/`25-violation-find-replace`/`26-corrector-ownership`
 + дополненная `16-capsule-integrity` + `29-textblock-multilevel-lists`
-(живое поведение Chromium под многоуровневыми списками, 16 сценариев: Tab/
+(живое поведение Chromium под многоуровневыми списками, 17 сценариев: Tab/
 Shift+Tab меняют уровень пункта и дают валидную вложенность; `indent` →
 `outdent` → `indent` возвращает пункт на тот же уровень той же разметкой
 (round-trip), Shift+Tab на верхнем уровне выводит пункт из списка абзацем и
