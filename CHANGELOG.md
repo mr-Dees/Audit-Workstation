@@ -1,6 +1,6 @@
 # CHANGELOG
 
-**Текущая версия: `17.1.2`.**
+**Текущая версия: `17.1.3`.**
 
 ## Методология
 
@@ -603,3 +603,10 @@ REST-контракты, схема БД и конфигурация не мен
   (UA_DATA/каталог пользователей — обе пустые по умолчанию), раньше описанные одним общим правилом.
   Удалён устаревший файл миграции `2026-08-19-bus-status-check-error.md` — расширенные CHECK'и уже
   объявлены в обеих `schema.sql`.
+- 17.1.3 · `7738d99a` — PATCH: документация сверена с кодом по итогам многоагентного аудита —
+  исправлены RateLimit-ключ и дефолт в architecture-and-backend.md, число таблиц домена acts в
+  database.md, владелец `create_streaming` и модуль перехвата форварда в agent-channel-sequence.md,
+  устаревший механизм cache-busting и счётчики файлов/строк в frontend-architecture.md, число
+  сценариев спеки 29 в textblock-editor-architecture.md, битая ссылка на чек-лист блока
+  конструктора в golden/README.md, отсутствовавшее покрытие `BridgeSchemaError`/`BridgeBackendError`
+  в retry-test-scenarios.md.
